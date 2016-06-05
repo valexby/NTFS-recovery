@@ -30,3 +30,16 @@
 
 # Debug files
 *.dSYM/
+/Debug/
+/Release/
+/x64/
+/NTFS-recovery.VC.opendb
+/NTFS-recovery.sdf
+/NTFS-recovery.sln
+/NTFS-recovery.vcxproj
+/NTFS-recovery.vcxproj.filters
+/back
+/boot_sector
+/dumpA
+/dumpB
+/dumpC
