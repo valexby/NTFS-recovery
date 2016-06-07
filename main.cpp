@@ -21,7 +21,8 @@ void print_ind_rec(index_record record);
 void print_dir(index_descriptor cur_dir);
 file_descriptor move_to_dir(LONGLONG mft_entry_numb, vector<MFT_FRAG> frags);
 index_descriptor move_to_index(file_descriptor dir_rec);
-vector<MFT_FRAG> get_mtf_chain();
+vector<MFT_FRAG> get_mtf_chain(LONGLONG* records_cnt);
+vector<LONGLONG> scan_for_del(vector<MFT_FRAG> frags, LONGLONG total_rec);
 
 int main()
 {
@@ -45,51 +46,61 @@ int main()
 	catch (string err_msg) {
 		err_exit(err_msg);
 	}
-	vector<MFT_FRAG> frags = get_mtf_chain();
-	file_descriptor cur_dir = move_to_dir(5, frags);
-	index_descriptor cur_index = move_to_index(cur_dir);
-	print_dir(cur_index);
-	string instruct;
-	cin >> instruct;
-	while (instruct!="exit")
+	LONGLONG total_rec;
+	vector<MFT_FRAG> frags = get_mtf_chain(&total_rec);
+	vector<LONGLONG> marked = scan_for_del(frags, total_rec);
+	//file_descriptor doe = move_to_dir(marked[1], frags);
+	for (vector<LONGLONG>::iterator it = marked.begin(); it != marked.end(); ++it)
 	{
-		int cur_way = atoi(instruct.c_str());
-		if (cur_way != 1)
+		if (*it < frags[1].beg_rec_num)
 		{
-			cur_dir = move_to_dir(cur_index.entries[cur_way-2].dwMFTRecNum, frags);
-			cur_index = move_to_index(cur_dir);
-			print_dir(cur_index);
+			buffer = read_sector(disk, frags[0].offset + *it - frags[0].beg_rec_num, 2);
 		}
-		cin >> instruct;
-	}
-	/*PARTITION cur_part = MBR.parts[part_num];
-	BYTE* sect_data = new BYTE[512], file_sign[5] = "FILE";
-	LONGLONG mft_relative_offset, mft_sector;
-	WORD flag;
-	vector<int> marked_sect;
-	mft_relative_offset = boot_sector.bpb.uchSecPerClust * boot_sector.bpb.n64MFTLogicalClustNum;
-	mft_sector = mft_relative_offset + MBR.parts[part_num].dwRelativeSector;
-	DWORD i = 0, allocated;
-	cout << '[';
-	while (i < cur_part.dwNumberSectors)
-	{
-		if (i / (cur_part.dwNumberSectors / 100) >(i - 1) / (cur_part.dwNumberSectors / 100)) cout << '|';
-		sect_data = read_sector(disk, mft_sector + i,1);
-		if (memcmp(sect_data, file_sign, 4)) 
+		else
 		{
-			delete[] sect_data;
-			i++;
-			continue;
+			buffer = read_sector(disk, frags[1].offset + *it - frags[1].beg_rec_num, 2);
 		}
-		memcpy(&flag, sect_data + 22, 2);
-		if (flag == 0x00) marked_sect.push_back(i);
-		memcpy(&allocated, sect_data + 28, 4);
-		i += allocated / 512;
-		delete[] sect_data;
+		dump_buffer(buffer, 1024, L"DUMP");
+		delete[] buffer;
 	}
-	cout << ']';*/
 	CloseHandle(disk);
 	return 0;
+}
+
+vector<LONGLONG> scan_for_del(vector<MFT_FRAG> frags, LONGLONG total_rec)
+{
+	LONGLONG rec_num, marker = 0;
+	cout << "Total wft records count is " << total_rec << endl;
+	BYTE* sect_data;
+	WORD flag;
+	vector<LONGLONG> marked_sect;
+	vector<MFT_FRAG>::iterator fragment;
+	cout << '[';
+	for (fragment = frags.begin(); fragment != frags.end(); ++fragment)
+	{
+		rec_num = 0;
+		while (rec_num < fragment->beg_rec_num)
+		{
+			if (marker == 0)
+			{
+				cout << '|';
+				marker = total_rec / 100;
+			}
+			marker--;
+			//sect_data = read_sector(disk, fragment->offset + rec_num * 2, 1);
+			//memcpy(&flag, sect_data + 22, 2);
+			//if (flag == 0x00)
+			file_descriptor fd = file_descriptor(disk, fragment->offset + rec_num*2);
+			//if ()
+			{
+				marked_sect.push_back(rec_num + fragment->beg_rec_num);
+			}
+			//delete[] sect_data;
+			rec_num++;
+		}
+	}
+	cout << ']';
+	return marked_sect;
 }
 
 file_descriptor move_to_dir(LONGLONG mft_entry_numb, vector<MFT_FRAG> frags)
@@ -103,7 +114,7 @@ file_descriptor move_to_dir(LONGLONG mft_entry_numb, vector<MFT_FRAG> frags)
 	return file_descriptor(disk, frags[i].offset + mft_entry_numb * 2);
 }
 
-vector<MFT_FRAG> get_mtf_chain()
+vector<MFT_FRAG> get_mtf_chain(LONGLONG* records_cnt)
 {
 	LONGLONG mft_relative_offset, mft_sector;
 	mft_relative_offset = boot_sector.bpb.uchSecPerClust * boot_sector.bpb.n64MFTLogicalClustNum;
@@ -119,13 +130,16 @@ vector<MFT_FRAG> get_mtf_chain()
 	vector<MFT_FRAG> result = vector<MFT_FRAG>(((non_resident_attr*)mft_file.attributes[data_attr_pos])->runs_col);
 	result[0].beg_rec_num = 0;
 	result[0].offset = mft_sector;
+	*records_cnt = 0;
 	for (i = 1; i < ((non_resident_attr*)mft_file.attributes[data_attr_pos])->runs_col;i++)
 	{
+		*records_cnt += ((non_resident_attr*)mft_file.attributes[data_attr_pos])->dataRuns[i - 1].n64AttrSizeClust * 8 / 2;
 		result[i].beg_rec_num = result[i-1].beg_rec_num + 
 			((non_resident_attr*)mft_file.attributes[data_attr_pos])->dataRuns[i - 1].n64AttrSizeClust * 8 / 2;
 		result[i].offset = result[i - 1].offset +
 			((non_resident_attr*)mft_file.attributes[data_attr_pos])->dataRuns[i].n64AttrOffsetClust * 8;
 	}
+	*records_cnt += ((non_resident_attr*)mft_file.attributes[data_attr_pos])->dataRuns[i - 1].n64AttrSizeClust * 8 / 2;
 	return result;
 }
 
