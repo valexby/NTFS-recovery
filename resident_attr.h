@@ -11,6 +11,8 @@ public:
 	BYTE cPadding;
 	resident_attr();
 	resident_attr(BYTE* buffer);
-	virtual ~resident_attr() = 0;
+	resident_attr(const resident_attr &);
+	resident_attr& operator=(const resident_attr&);
+	virtual ~resident_attr();
 };
 

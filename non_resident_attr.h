@@ -1,5 +1,7 @@
 #pragma once
 #include "std_attr_header.h"
+#include "attr_data_run.h"
+
 class non_resident_attr :
 	public std_attr_header
 {
@@ -16,6 +18,8 @@ public:
 	int runs_col = 0;
 	non_resident_attr();
 	non_resident_attr(BYTE* raw);
+	non_resident_attr(const non_resident_attr &);
+	non_resident_attr& operator=(const non_resident_attr&);
 	~non_resident_attr();
 private:
 	static int get_runs_col(BYTE* raw);

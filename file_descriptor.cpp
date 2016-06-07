@@ -10,12 +10,14 @@ file_descriptor::file_descriptor(HANDLE disk, LONGLONG sector)
 	try 
 	{
 		BYTE* buffer = read_sector(disk, sector, 1);
-		init(buffer);
-		if (dwRealFileSize > 512)
+		if (*(DWORD*)(buffer+24) > 512)
 		{
-			delete[] buffer;
-			buffer = read_sector(disk, sector, dwRealFileSize / 512 + 1);
+			BYTE* temp = buffer;
+			buffer = read_sector(disk, sector, *(DWORD*)(temp + 24) / 512 + (*(DWORD*)(temp + 24) / 512 != 0 ? 1 : 0));
+			delete[] temp;
 		}
+		init(buffer);
+		clean_sect_bord(buffer);
 		int i, cur_offset = wFirstAttrOffset;
 		attr_col = get_attr_col(buffer + wFirstAttrOffset);
 		attributes = new std_attr_header*[attr_col];
@@ -34,7 +36,6 @@ file_descriptor::file_descriptor(HANDLE disk, LONGLONG sector)
 
 file_descriptor::~file_descriptor()
 {
-	std_info* temp;
 	for (int i = 0; i < attr_col;i++)
 	{
 		delete attributes[i];
@@ -43,19 +44,68 @@ file_descriptor::~file_descriptor()
 	delete[] updateSeq;
 }
 
+void file_descriptor::clean_sect_bord(BYTE* raw) const
+{
+	int i;
+	for (i = 0; i < wUpdtSeqSize-1; i++)
+	{
+		memcpy(raw + (i + 1) * 512 - 2, &updateSeq[i], 2);
+	}
+}
+
+file_descriptor::file_descriptor(const file_descriptor& source)
+{
+	*this = source;
+}
+
+
+file_descriptor& file_descriptor::operator=(const file_descriptor& source)
+{
+	if (this == &source) return *this;
+	memcpy(signature, source.signature, 4);
+	memcpy(&wUpdtSeqOffset, &source.wUpdtSeqOffset, 4);
+	n64LogFileSeq = source.n64LogFileSeq;
+	memcpy(&wUseCnt, &source.wUseCnt, 8);
+	memcpy(&dwRealFileSize, &source.dwRealFileSize, 8);
+	n64RefToBaseFile = source.n64RefToBaseFile;
+	memcpy(&wNextAttrId, &source.wNextAttrId, 4);
+	updateSeq = new WORD[wUpdtSeqSize - 1];
+	memcpy(updateSeq, source.updateSeq, wUpdtSeqSize - 1);
+	attr_col = source.attr_col;
+	attributes = new std_attr_header*[attr_col];
+	for (int i = 0; i < attr_col; i++)
+	{
+		if (source.attributes[i]->cResident == 1) attributes[i] = new non_resident_attr(*(non_resident_attr*)source.attributes[i]);
+		else
+		{
+			switch(source.attributes[i]->dwAttrType)
+			{
+			case 0x10:
+				attributes[i] = new std_info(*(std_info*)source.attributes[i]);
+				break;
+			default:
+				attributes[i] = new std_attr_header(*source.attributes[i]);
+				break;
+			}
+		}
+	}
+	return *this;
+}
+
+
 void file_descriptor::init(BYTE* buffer)
 {
 	int i;
 	for (i = 0; i < 4; i++)
 		signature[i] = buffer[i];
-	memcpy(&wOffsetOfUpdtSeq, buffer + 4, 4);
-	n64LogFileSeq = *(buffer + 8);
+	memcpy(&wUpdtSeqOffset, buffer + 4, 4);
+	memcpy(&n64LogFileSeq, buffer + 8, 8);
 	memcpy(&wUseCnt, buffer + 16, 8);
 	memcpy(&dwRealFileSize, buffer + 24, 8);
-	n64RefToBaseFile = *(buffer + 32);
+	memcpy(&n64RefToBaseFile, buffer + 32, 8);
 	memcpy(&wNextAttrId, buffer + 40, 4);
-	updateSeq = new WORD[wSizeOfUpdtSeq];
-	memcpy(updateSeq, buffer + 44, wSizeOfUpdtSeq * 2);
+	updateSeq = new WORD[wUpdtSeqSize-1];
+	memcpy(updateSeq, buffer + 44, wUpdtSeqSize * 2 - 2);
 }
 
 int file_descriptor::get_attr_col(BYTE* start)

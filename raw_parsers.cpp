@@ -54,13 +54,3 @@ NTFS_PART_BOOT_SECTOR parse_to_boot_sector(BYTE *buffer)
 	memcpy(&boot_sector.wSecMark, buffer + 510, 2);
 	return boot_sector;
 }
-
-void dump_buffer(BYTE* buffer, int size, wchar_t* name)
-{
-	HANDLE hFile = CreateFile(name, GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-	if (!WriteFile(hFile, buffer, size, nullptr, nullptr))
-	{
-		throw "Dump save error " + std::to_string(GetLastError());
-	}
-	CloseHandle(hFile);
-}

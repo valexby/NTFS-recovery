@@ -4,16 +4,9 @@
 class attr_data_run
 {
 public :
-	union
-	{
-		WORD buff;
-		struct
-		{
-			BYTE right;
-			BYTE left;
-		};
-	};
-	BYTE* value = nullptr;
+	BYTE size;
+	LONGLONG n64AttrSizeClust;
+	LONGLONG n64AttrOffsetClust;
 	attr_data_run();
 	attr_data_run(BYTE* buffer);
 	~attr_data_run();

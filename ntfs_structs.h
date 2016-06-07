@@ -66,3 +66,9 @@ typedef struct
 	PARTITION parts[4];
 	BYTE signature1, signature2;
 } MBR_SECTOR;
+
+typedef struct
+{
+	LONGLONG beg_rec_num;
+	LONGLONG offset;
+} MFT_FRAG;

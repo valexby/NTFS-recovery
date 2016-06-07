@@ -11,6 +11,7 @@ public:
 	WORD wNameOffset;
 	WORD wFlags;
 	WORD wAtrrId;
+	BYTE* attrContent = nullptr;
 	char* name = nullptr;
 	std_attr_header(BYTE* buffer);
 	std_attr_header();
