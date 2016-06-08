@@ -143,3 +143,32 @@ std_attr_header* file_descriptor::build_attr(BYTE* raw)
 	}
 	return res_ptr;
 }
+
+bool file_descriptor::isDirectory() const
+{
+	for (int i = 0; i < attr_col;i++)
+	{
+		if (attributes[i]->dwAttrType == 0xA0) return true;
+	}
+	return false;
+}
+
+int file_descriptor::get_attr_pos(int signature) const
+{
+	for (int i = 0; i < attr_col; i++)
+	{
+		if (attributes[i]->dwAttrType == signature) return i;
+	}
+	return -1;
+}
+
+string file_descriptor::get_file_name() const
+{
+	string out;
+	int pos = get_attr_pos(0x30);
+	for (int i = 0; i < attributes[pos]->attr_cont_len;i+=2)
+	{
+		out += attributes[pos]->attrContent[i];
+	}
+	return out;
+}

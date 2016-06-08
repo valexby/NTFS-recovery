@@ -18,7 +18,6 @@ BYTE* read_sector(HANDLE disk, LONGLONG sect_num, DWORD sect_col)
 	}
 	if (!ReadFile(disk, buffer, sect_col * 512, &dwRead, nullptr))
 		throw "ReadFile error " + GetLastError();
-	//printf("Byte readed %d\n", dwRead);
 	return buffer;
 }
 

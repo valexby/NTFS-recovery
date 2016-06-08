@@ -51,12 +51,15 @@ index_descriptor::index_descriptor(HANDLE disk, LONGLONG sector, LONGLONG size)
 int index_descriptor::get_entries_cnt(BYTE* start)
 {
 	int res = 0;
-	while (*(WORD*)(start+12) != 2)
+	DWORD buff;
+	memcpy(&buff, start, 4);
+	while (*(WORD*)(start + 12) != 2 || buff != 0)
 	{
 		res++;
 		start += *(WORD*)(start + 8);
+		memcpy(&buff, start, 4);
 	}
-	return res;
+	return --res;
 }
 
 

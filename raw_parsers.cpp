@@ -1,5 +1,4 @@
 #include "raw_parser.h"
-#include <string>
 
 MBR_SECTOR parse_to_mbr(BYTE *buffer)
 {
