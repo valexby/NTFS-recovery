@@ -16,6 +16,7 @@ file_descriptor::file_descriptor(HANDLE disk, LONGLONG sector)
 			buffer = read_sector(disk, sector, *(DWORD*)(temp + 24) / 512 + (*(DWORD*)(temp + 24) / 512 != 0 ? 1 : 0));
 			delete[] temp;
 		}
+		dump_buffer(buffer, *(DWORD*)(buffer + 24), L"DUMP1");
 		init(buffer);
 		clean_sect_bord(buffer);
 		int i, cur_offset = wFirstAttrOffset;
@@ -162,13 +163,12 @@ int file_descriptor::get_attr_pos(int signature) const
 	return -1;
 }
 
-string file_descriptor::get_file_name() const
+wchar_t* file_descriptor::get_file_name() const
 {
-	string out;
+	wchar_t* out;
 	int pos = get_attr_pos(0x30);
-	for (int i = 0; i < attributes[pos]->attr_cont_len;i+=2)
-	{
-		out += attributes[pos]->attrContent[i];
-	}
+	out = new wchar_t[attributes[pos]->attrContent[88]];
+	for (int i = 0; i < attributes[pos]->attrContent[88] * 2; i+=2)
+		memcpy(&out[i / 2], &attributes[pos]->attrContent[90 + i], 2);
 	return out;
 }

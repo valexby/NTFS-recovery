@@ -30,7 +30,7 @@ public :
 	file_descriptor& operator=(const file_descriptor&);
 	bool isDirectory() const;
 	int get_attr_pos(int signature) const;
-	string get_file_name() const;
+	wchar_t* get_file_name() const;
 private :
 	void init(BYTE* buffer);
 	static std_attr_header* build_attr(BYTE* raw);
