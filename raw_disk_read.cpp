@@ -12,7 +12,7 @@ BYTE* read_sector(HANDLE disk, LONGLONG sect_num, DWORD sect_col)
 	li.QuadPart = offset;
 	DWORD dwRead;
 	BYTE* buffer = new BYTE[sect_col * 512];
-	if ((li.LowPart = SetFilePointer(disk, li.LowPart, &li.HighPart, FILE_BEGIN) == INVALID_SET_FILE_POINTER) &&
+	if ((li.LowPart = SetFilePointer(disk, li.LowPart, &li.HighPart, FILE_BEGIN)) == INVALID_SET_FILE_POINTER &&
 		GetLastError() != NO_ERROR) {
 		throw  "Set file pointer error " + to_string(GetLastError());
 	}

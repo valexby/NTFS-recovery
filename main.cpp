@@ -1,13 +1,13 @@
 #include <iostream>
 #include <string>
 #include <Windows.h>
+#include <vector>
+
 #include "ntfs_structs.h"
 #include "raw_disk_read.h"
 #include "file_descriptor.h"
 #include "non_resident_attr.h"
 #include "index_descriptor.h"
-#include <vector>
-
 using namespace std;
 
 HANDLE disk;
@@ -22,6 +22,7 @@ void print_dir(index_descriptor cur_dir);
 file_descriptor move_to_dir(LONGLONG mft_entry_numb, vector<MFT_FRAG> frags);
 index_descriptor move_to_index(file_descriptor dir_rec);
 vector<MFT_FRAG> get_mtf_chain();
+void move_to_data(file_descriptor file_rec);
 
 int main()
 {
@@ -57,37 +58,16 @@ int main()
 		if (cur_way != 1)
 		{
 			cur_dir = move_to_dir(cur_index.entries[cur_way-2].dwMFTRecNum, frags);
-			cur_index = move_to_index(cur_dir);
+			try {
+				cur_index = move_to_index(cur_dir);
+			}
+			catch (int) {
+				cin >> instruct; continue; }
 			print_dir(cur_index);
 		}
 		cin >> instruct;
 	}
-	/*PARTITION cur_part = MBR.parts[part_num];
-	BYTE* sect_data = new BYTE[512], file_sign[5] = "FILE";
-	LONGLONG mft_relative_offset, mft_sector;
-	WORD flag;
-	vector<int> marked_sect;
-	mft_relative_offset = boot_sector.bpb.uchSecPerClust * boot_sector.bpb.n64MFTLogicalClustNum;
-	mft_sector = mft_relative_offset + MBR.parts[part_num].dwRelativeSector;
-	DWORD i = 0, allocated;
-	cout << '[';
-	while (i < cur_part.dwNumberSectors)
-	{
-		if (i / (cur_part.dwNumberSectors / 100) >(i - 1) / (cur_part.dwNumberSectors / 100)) cout << '|';
-		sect_data = read_sector(disk, mft_sector + i,1);
-		if (memcmp(sect_data, file_sign, 4)) 
-		{
-			delete[] sect_data;
-			i++;
-			continue;
-		}
-		memcpy(&flag, sect_data + 22, 2);
-		if (flag == 0x00) marked_sect.push_back(i);
-		memcpy(&allocated, sect_data + 28, 4);
-		i += allocated / 512;
-		delete[] sect_data;
-	}
-	cout << ']';*/
+	
 	CloseHandle(disk);
 	return 0;
 }
@@ -97,10 +77,10 @@ file_descriptor move_to_dir(LONGLONG mft_entry_numb, vector<MFT_FRAG> frags)
 	int i = 1;
 	while (i < frags.size() && mft_entry_numb > frags[i].beg_rec_num) i++;
 	i--;
-	BYTE* test_buffer = read_sector(disk, frags[i].offset + mft_entry_numb * 2, 2);
-	//dump_buffer(test_buffer, 1024, L"MFT2");
+	LONGLONG offset = frags[i].offset + (mft_entry_numb - frags[i].beg_rec_num) * 2;
+	BYTE* test_buffer = read_sector(disk, offset, 2);
 	delete[] test_buffer;
-	return file_descriptor(disk, frags[i].offset + mft_entry_numb * 2);
+	return file_descriptor(disk, offset);
 }
 
 vector<MFT_FRAG> get_mtf_chain()
@@ -136,10 +116,29 @@ index_descriptor move_to_index(file_descriptor dir_rec)
 	{
 		if (dir_rec.attributes[i]->dwAttrType == 0xA0) break;
 	}
-	if (i == dir_rec.attr_col) throw "Index allocation attribute in rec not found";
+	if (i == dir_rec.attr_col)
+	{
+		move_to_data(dir_rec);
+		cout << "Saved!\n";
+		throw 123;
+	}
 	return index_descriptor(disk, MBR.parts[part_num].dwRelativeSector +
 		8 * ((non_resident_attr*)dir_rec.attributes[i])->dataRuns[0].n64AttrOffsetClust,
 		8 * ((non_resident_attr*)dir_rec.attributes[i])->dataRuns[0].n64AttrSizeClust);
+}
+
+void move_to_data(file_descriptor file_rec)
+{
+	int i;
+	for (i = 0; i < file_rec.attr_col; i++)
+	{
+		if (file_rec.attributes[i]->dwAttrType == 0x80) break;
+	}
+	if (i == file_rec.attr_col) throw "Data attribute in rec not found";
+	if (file_rec.attributes[i]->cResident == 0)
+	{
+		dump_buffer(file_rec.attributes[i]->attrContent, file_rec.attributes[i]->attr_cont_len, L"Test");
+	}
 }
 
 void print_dir(index_descriptor cur_dir)

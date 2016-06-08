@@ -31,6 +31,7 @@ std_attr_header& std_attr_header::operator=(const std_attr_header& source)
 		dwFullAttrLen = source.dwFullAttrLen;
 		cResident = source.cResident;
 		cNameLen = source.cNameLen;
+		attr_cont_len = source.attr_cont_len;
 		wNameOffset = source.wNameOffset;
 		wFlags = source.wFlags;
 		wAtrrId = source.wAtrrId;
@@ -52,6 +53,7 @@ void std_attr_header::init(BYTE* buffer)
 		name = new char[cNameLen];
 		memcpy(name, buffer + wNameOffset, cNameLen);
 	}
-	attrContent = new BYTE[dwFullAttrLen - (wNameOffset + cNameLen)];
-	memcpy(attrContent, buffer + wNameOffset + cNameLen, dwFullAttrLen - (wNameOffset + cNameLen));
+	attr_cont_len = dwFullAttrLen - (wNameOffset + cNameLen);
+	attrContent = new BYTE[attr_cont_len];
+	memcpy(attrContent, buffer + wNameOffset + cNameLen, attr_cont_len);
 }
