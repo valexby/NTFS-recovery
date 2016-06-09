@@ -27,6 +27,7 @@ public :
 	file_descriptor(HANDLE disk, LONGLONG sector);
 	~file_descriptor();
 	file_descriptor(const file_descriptor &);
+	file_descriptor();
 	file_descriptor& operator=(const file_descriptor&);
 	bool isDirectory() const;
 	int get_attr_pos(int signature) const;
@@ -35,6 +36,6 @@ private :
 	void init(BYTE* buffer);
 	static std_attr_header* build_attr(BYTE* raw);
 	static bool is_resident(BYTE* raw);
-	static int get_attr_col(BYTE* start);
+	int get_attr_col(BYTE* start);
 	void clean_sect_bord(BYTE* raw) const;
 };

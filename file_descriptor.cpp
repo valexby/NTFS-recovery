@@ -18,7 +18,13 @@ file_descriptor::file_descriptor(HANDLE disk, LONGLONG sector)
 		}
 		dump_buffer(buffer, *(DWORD*)(buffer + 24), L"DUMP1");
 		init(buffer);
-		clean_sect_bord(buffer);
+		try {
+			clean_sect_bord(buffer);
+		}
+		catch (string err_msg)
+		{
+			throw;
+		}
 		int i, cur_offset = wFirstAttrOffset;
 		attr_col = get_attr_col(buffer + wFirstAttrOffset);
 		attributes = new std_attr_header*[attr_col];
@@ -35,6 +41,8 @@ file_descriptor::file_descriptor(HANDLE disk, LONGLONG sector)
 	}
 }
 
+file_descriptor::file_descriptor() {}
+
 file_descriptor::~file_descriptor()
 {
 	for (int i = 0; i < attr_col;i++)
@@ -50,7 +58,14 @@ void file_descriptor::clean_sect_bord(BYTE* raw) const
 	int i;
 	for (i = 0; i < wUpdtSeqSize-1; i++)
 	{
-		memcpy(raw + (i + 1) * 512 - 2, &updateSeq[i], 2);
+		if ((i + 1) * 512 - 2 > dwRealFileSize) break;
+		if (!memcmp(raw + (i + 1) * 512 - 2, &wUpdateSeqNumb, 2))
+			memcpy(raw + (i + 1) * 512 - 2, &updateSeq[i], 2);
+		else 
+		{
+			string sterr = "Bad sector\n";
+			throw sterr;
+		}
 	}
 }
 
@@ -167,7 +182,9 @@ wchar_t* file_descriptor::get_file_name() const
 {
 	wchar_t* out;
 	int pos = get_attr_pos(0x30);
-	out = new wchar_t[attributes[pos]->attrContent[88]];
+	if (pos == -1) return nullptr;
+	out = new wchar_t[attributes[pos]->attrContent[88] + 1];
+	out[attributes[pos]->attrContent[88]] = 0;
 	for (int i = 0; i < attributes[pos]->attrContent[88] * 2; i+=2)
 		memcpy(&out[i / 2], &attributes[pos]->attrContent[90 + i], 2);
 	return out;
