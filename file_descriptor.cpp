@@ -119,9 +119,10 @@ void file_descriptor::init(BYTE* buffer)
 	memcpy(&wUseCnt, buffer + 16, 8);
 	memcpy(&dwRealFileSize, buffer + 24, 8);
 	memcpy(&n64RefToBaseFile, buffer + 32, 8);
-	memcpy(&wNextAttrId, buffer + 40, 4);
+	memcpy(&wNextAttrId, buffer + 40, 2);
+	memcpy(&wUpdateSeqNumb, buffer + wUpdtSeqOffset, 2);
 	updateSeq = new WORD[wUpdtSeqSize-1];
-	memcpy(updateSeq, buffer + 44, wUpdtSeqSize * 2 - 2);
+	memcpy(updateSeq, buffer + wUpdtSeqOffset + 2, wUpdtSeqSize * 2 - 2);
 }
 
 int file_descriptor::get_attr_col(BYTE* start)

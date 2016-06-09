@@ -24,6 +24,7 @@ index_descriptor move_to_index(file_descriptor dir_rec);
 void move_data(file_descriptor file_rec);
 vector<MFT_FRAG> get_mtf_chain(LONGLONG* records_cnt);
 vector<LONGLONG> scan_for_del(vector<MFT_FRAG> frags, LONGLONG total_rec);
+int wstrlen(wchar_t* str);
 
 int main()
 {
@@ -49,21 +50,28 @@ int main()
 	}
 	LONGLONG total_rec;
 	vector<MFT_FRAG> frags = get_mtf_chain(&total_rec);
+	reverse(frags.begin(), frags.end());
 	vector<LONGLONG> marked = scan_for_del(frags, total_rec);
+	cout << endl << marked.size() << " deleted file records found\n";
+	cout << '[';
+	int flag = marked.size() / 50;
 	for (vector<LONGLONG>::iterator it = marked.begin(); it != marked.end(); ++it)
 	{
+		if (flag == 0)
+		{
+			cout << '|';
+			flag = marked.size() / 50;
+		}
+		flag--;
 		file_descriptor fd;
-		for (vector<MFT_FRAG>::iterator j = --frags.end(); j != frags.begin();--j)
-			if (*it > j->beg_rec_num) {		
+		for (vector<MFT_FRAG>::iterator j = frags.begin(); j!= frags.end(); ++j)
+			if (*it > j->beg_rec_num) 
+			{		
 				buffer = read_sector(disk, j->offset + *it - j->beg_rec_num, 2);
 				if (buffer[0] == 'F' && buffer[1] == 'I' && buffer[2] == 'L' && buffer[3] == 'E')
 				{
 					string st = to_string(*it);
 					dump_buffer((BYTE*)st.c_str(), st.size(), L"LASTINDX");
-					if (*it == 273284)
-					{
-						st += "Helol";
-					}
 					dump_buffer(buffer, 1024, L"TEST2");
 					try {
 						fd = file_descriptor(disk, j->offset + *it - j->beg_rec_num);
@@ -72,14 +80,14 @@ int main()
 						cout << err_msg;
 						continue;
 					}
-					wchar_t str[] = L"valex";
-					wchar_t* name = fd.get_file_name();
-					if (name!=nullptr && !memcmp(str, name, 10))
-						move_data(fd);
+					move_data(fd);
 				}
 				delete[] buffer;
+				break;
 			}
 	}
+	cout << ']' << endl;
+	cout << "Done!\n";
 	CloseHandle(disk);
 	return 0;
 }
@@ -93,24 +101,25 @@ vector<LONGLONG> scan_for_del(vector<MFT_FRAG> frags, LONGLONG total_rec)
 	vector<LONGLONG> marked_sect;
 	vector<MFT_FRAG>::iterator fragment;
 	cout << '[';
-	for (fragment = frags.begin(); fragment != frags.end(); ++fragment)
+	rec_num = total_rec;
+	fragment = frags.end() - 1;
+	while (rec_num >= 0)
 	{
-		rec_num = 0;
-		while (rec_num < fragment->beg_rec_num)
+		if (rec_num < fragment->beg_rec_num)
+			--fragment;
+		if (marker == 0)
 		{
-			//if (marked_sect.size() > 10) break;
-			if (marker == 0)
-			{
-				cout << '|';
-				marker = total_rec / 100;
-			}
-			marker--;
-			sect_data = read_sector(disk, fragment->offset + rec_num * 2, 1);
-			memcpy(&flag, sect_data + 22, 2);
-			if (flag == 0x00 && sect_data[0] == 'F' && sect_data[1] == 'I' && sect_data[2] == 'L' && sect_data[3] == 'E')
-				marked_sect.push_back(rec_num + fragment->beg_rec_num);
-			rec_num++;
+			cout << '|';
+			marker = total_rec / 50;
 		}
+		marker--;
+		sect_data = read_sector(disk, fragment->offset + rec_num * 2, 1);
+		memcpy(&flag, sect_data + 22, 2);
+		if (flag == 0x00 && sect_data[0] == 'F' && sect_data[1] == 'I' && sect_data[2] == 'L' && sect_data[3] == 'E')
+		{
+			marked_sect.push_back(rec_num + fragment->beg_rec_num);
+		}
+		rec_num--;
 	}
 	cout << ']';
 	return marked_sect;
@@ -166,6 +175,23 @@ index_descriptor move_to_index(file_descriptor dir_rec)
 		8 * ((non_resident_attr*)dir_rec.attributes[pos])->dataRuns[0].n64AttrSizeClust);
 }
 
+int wstrlen(wchar_t* str)
+{
+	int i = 0;
+	while (str[i] != 0) { i++; }
+	return i;
+}
+
+bool wstrcmp(wchar_t* str1, wchar_t* str2)
+{
+	int len, i;
+	if (wstrlen(str1) != wstrlen(str2)) return false;
+	len = wstrlen(str1);
+	for (i = 0; i < len; i++)
+		if (str1[i] != str2[i]) break;
+	return i == len;
+}
+
 void move_data(file_descriptor file_rec)
 {
 	int pos;
@@ -173,24 +199,44 @@ void move_data(file_descriptor file_rec)
 	if (pos == -1) {
 		return;
 	}
+	wchar_t* name = file_rec.get_file_name();
+	if (name == nullptr) return;
+	int len = wstrlen(name);
+	wchar_t* full_name = new wchar_t[len + 5];
+	full_name[0] = 'n';
+	full_name[1] = 'c';
+	full_name[2] = '\\';
+	memcpy(&full_name[3], name, len * 2 + 2);
+	delete[] name;
 	if (file_rec.attributes[pos]->cResident == 0)
 	{
-		wchar_t* name = file_rec.get_file_name();
 		if (name != nullptr)
-			dump_buffer(file_rec.attributes[pos]->attrContent, file_rec.attributes[pos]->attr_cont_len, file_rec.get_file_name());
+			dump_buffer(file_rec.attributes[pos]->attrContent, file_rec.attributes[pos]->attr_cont_len, full_name);
 	}
 	else
 	{
-		/*non_resident_attr* fragments = (non_resident_attr*)file_rec.attributes[pos];
+		non_resident_attr* fragments = (non_resident_attr*)file_rec.attributes[pos];
+		vector<BYTE*> buff_set = vector<BYTE*>();
+		int size = 0;
 		for (int i = 0; i < fragments->runs_col;i++)
 		{
-			BYTE* buffer;
-			buffer = read_sector(disk, MBR.parts[part_num].dwRelativeSector + fragments->dataRuns[i].n64AttrOffsetClust * 8,
-				fragments->dataRuns[i].n64AttrSizeClust * 8);
-			dump_buffer(buffer, fragments->dataRuns[i].n64AttrSizeClust * 8 * 512, name);
-			name[8]++;
-		}*/
+			buff_set.push_back(read_sector(disk, MBR.parts[part_num].dwRelativeSector + fragments->dataRuns[i].n64AttrOffsetClust * 8,
+				fragments->dataRuns[i].n64AttrSizeClust * 8));
+			if (buff_set[i]!=nullptr)
+				size += strlen((char*)buff_set[i]);
+		}
+		BYTE* buffer = new BYTE[size];
+		size = 0;
+		for (vector<BYTE*>::iterator it = buff_set.begin(); it != buff_set.end();++it)
+		{
+			if (*it == nullptr) continue;
+			memcpy(buffer, *it, strlen((char*)*it));
+			size += strlen((char*)*it);
+			delete[] *it;
+		}
+		dump_buffer(buffer, strlen((char*)buffer), full_name);
 	}
+	delete[] full_name;
 }
 
 void print_dir(index_descriptor cur_dir)

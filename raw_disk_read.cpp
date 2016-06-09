@@ -14,10 +14,14 @@ BYTE* read_sector(HANDLE disk, LONGLONG sect_num, DWORD sect_col)
 	BYTE* buffer = new BYTE[sect_col * 512];
 	if ((li.LowPart = SetFilePointer(disk, li.LowPart, &li.HighPart, FILE_BEGIN)) == INVALID_SET_FILE_POINTER &&
 		GetLastError() != NO_ERROR) {
-		throw  "Set file pointer error " + to_string(GetLastError());
+		cerr<<  "Set file pointer error " + to_string(GetLastError());
+		return nullptr;
 	}
 	if (!ReadFile(disk, buffer, sect_col * 512, &dwRead, nullptr))
-		throw "ReadFile error " + GetLastError();
+	{
+		cerr << "ReadFile error " + GetLastError();
+		return nullptr;
+	}
 	return buffer;
 }
 
@@ -77,6 +81,5 @@ void dump_buffer(BYTE* buffer, int size, wchar_t* name)
 	{
 		throw "Dump save error " + to_string(GetLastError());
 	}
-	cout << dwWritten << " bytes written\n";
 	CloseHandle(hFile);
 }
